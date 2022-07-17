@@ -21,7 +21,7 @@ describe("FundMe", function () {
 
     describe("constructor", function () {
         it("Set the aggregator address", async function () {
-            const response = await fundMe.priceFeed()
+            const response = await fundMe.s_priceFeed()
             assert.equal(response, mockV3Aggregator.address)
         })
     })
@@ -35,13 +35,13 @@ describe("FundMe", function () {
 
         it("Add sender to the array of funders", async function () {
             await fundMe.fund({ value: ethAmountToSend })
-            const response = await fundMe.funders(0)
+            const response = await fundMe.s_funders(0)
             assert.equal(response, deployer)
         })
 
         it("Update amount funded mapping if ETH is received successfully", async function () {
             await fundMe.fund({ value: ethAmountToSend })
-            const response = await fundMe.addressToAmountFunded(deployer)
+            const response = await fundMe.s_addressToAmountFunded(deployer)
             assert.equal(response.toString(), ethAmountToSend.toString())
         })
     })
@@ -111,12 +111,12 @@ describe("FundMe", function () {
                 endingBalanceDeployer.add(gasCost).toString()
             )
             // Make sure the funder array is empty
-            await expect(fundMe.funders(0)).to.be.reverted
+            await expect(fundMe.s_funders(0)).to.be.reverted
             // Make sure the mapping is cleared out
             for (let i = 1; i < 5; i++) {
                 const accountAddress = accounts[i].address
                 assert.equal(
-                    await fundMe.addressToAmountFunded(accountAddress),
+                    await fundMe.s_addressToAmountFunded(accountAddress),
                     0
                 )
             }
@@ -130,5 +130,56 @@ describe("FundMe", function () {
                 fundMeConnected.withdraw()
             ).to.be.revertedWithCustomError(fundMe, "FundMe__NotOwner")
         })
+    })
+
+    it("Cheaper Withdraw --- multiple funders", async function () {
+        // Arrange
+        const accounts = await ethers.getSigners()
+        for (let i = 1; i < 5; i++) {
+            const fundMeConnected = await fundMe.connect(accounts[i])
+            await fundMeConnected.fund({ value: ethAmountToSend })
+        }
+        const startingBalanceFundMe = await fundMe.provider.getBalance(
+            fundMe.address
+        )
+        const startingBalanceDeployer = await fundMe.provider.getBalance(
+            deployer
+        )
+        // Act
+        const transactionResponse = await fundMe.cheaperWithdraw()
+        const transactionReceipt = await transactionResponse.wait(1)
+        const gasCost = transactionReceipt.gasUsed.mul(
+            transactionReceipt.effectiveGasPrice
+        )
+        const endingBalanceFundMe = await fundMe.provider.getBalance(
+            fundMe.address
+        )
+        const endingBalanceDeployer = await fundMe.provider.getBalance(deployer)
+        // Assert
+        assert.equal(endingBalanceFundMe, 0)
+        assert.equal(
+            startingBalanceFundMe.add(startingBalanceDeployer).toString(),
+            endingBalanceDeployer.add(gasCost).toString()
+        )
+        // Make sure the funder array is empty
+        await expect(fundMe.s_funders(0)).to.be.reverted
+        // Make sure the mapping is cleared out
+        for (let i = 1; i < 5; i++) {
+            const accountAddress = accounts[i].address
+            assert.equal(
+                await fundMe.s_addressToAmountFunded(accountAddress),
+                0
+            )
+        }
+    })
+
+    it("Only owner can withdraw ETH", async function () {
+        // Arrange
+        const attackerAccount = (await ethers.getSigners())[1]
+        const fundMeConnected = await fundMe.connect(attackerAccount)
+        await expect(fundMeConnected.withdraw()).to.be.revertedWithCustomError(
+            fundMe,
+            "FundMe__NotOwner"
+        )
     })
 })

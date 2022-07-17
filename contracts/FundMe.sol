@@ -25,10 +25,10 @@ contract FundMe {
     // 23515 gas - non-constant
     uint256 public MINIMUM_USD = 10 * 1e18;
 
-    address[] public funders;
-    mapping(address => uint256) public addressToAmountFunded;
+    address[] public s_funders;
+    mapping(address => uint256) public s_addressToAmountFunded;
 
-    AggregatorV3Interface public priceFeed;
+    AggregatorV3Interface public s_priceFeed;
 
     modifier onlyOwner() {
         // 21509 gas - require
@@ -53,7 +53,7 @@ contract FundMe {
 
     constructor(address priceFeedAddress) {
         i_owner = msg.sender;
-        priceFeed = AggregatorV3Interface(priceFeedAddress);
+        s_priceFeed = AggregatorV3Interface(priceFeedAddress);
     }
 
     // Fallback to receive() when msg.data is empty in a transaction
@@ -66,7 +66,7 @@ contract FundMe {
         fund();
     }
 
-    // payable = this function can send and receive funds
+    // payable = this function can receive funds
     /** */
     function fund() public payable {
         // If this "require" condition is not satisfied, the transaction is reverted
@@ -74,27 +74,27 @@ contract FundMe {
         // 1e18 = 1 * 10^18 Wei = 1 Ether
         // require(getConversionRate(msg.value) >= MINIMUM_USD, "Not enough Ether");
         require(
-            msg.value.getConversionRate(priceFeed) > MINIMUM_USD,
+            msg.value.getConversionRate(s_priceFeed) > MINIMUM_USD,
             "Please send more than 10 USD worth of Ether"
         );
-        funders.push(msg.sender);
-        addressToAmountFunded[msg.sender] += msg.value;
+        s_funders.push(msg.sender);
+        s_addressToAmountFunded[msg.sender] += msg.value;
     }
 
     function withdraw() public onlyOwner {
         // Reset the mapping that tracks funders and their amount
         for (
             uint256 funderIndex = 0;
-            funderIndex < funders.length;
+            funderIndex < s_funders.length;
             funderIndex++
         ) {
-            address funderAddress = funders[funderIndex];
-            addressToAmountFunded[funderAddress] = 0;
+            address funderAddress = s_funders[funderIndex];
+            s_addressToAmountFunded[funderAddress] = 0;
         }
 
         // Reset an array
         // (0) means the new array will have 0 elements to begin with
-        funders = new address[](0);
+        s_funders = new address[](0);
 
         // 3 ways to withdraw the fund:
         // 1) Transfer
@@ -116,5 +116,23 @@ contract FundMe {
             value: address(this).balance
         }("");
         require(callSuccess, "Call failed");
+    }
+
+    function cheaperWithdraw() public onlyOwner {
+        (bool callSuccess, ) = payable(i_owner).call{
+            value: address(this).balance
+        }("");
+        require(callSuccess, "Call failed");
+
+        address[] memory funders = s_funders;
+        for (
+            uint256 funderIndex = 0;
+            funderIndex < funders.length;
+            funderIndex++
+        ) {
+            address funderAddress = funders[funderIndex];
+            s_addressToAmountFunded[funderAddress] = 0;
+        }
+        s_funders = new address[](0);
     }
 }
