@@ -17,7 +17,7 @@ contract FundMe {
     //   the contract's runtime code before it is returned
     //   by replacing all references to immutables by the values assigned to the them.
     // Reference: https://ethereum.stackexchange.com/questions/82240/what-is-the-immutable-keyword-in-solidity
-    address public immutable i_owner;
+    address private immutable i_owner;
     // 23619 gas - non-immutable
     // 21508 gas - immutable
 
@@ -25,10 +25,10 @@ contract FundMe {
     // 23515 gas - non-constant
     uint256 public MINIMUM_USD = 10 * 1e18;
 
-    address[] public s_funders;
-    mapping(address => uint256) public s_addressToAmountFunded;
+    address[] private s_funders;
+    mapping(address => uint256) private s_addressToAmountFunded;
 
-    AggregatorV3Interface public s_priceFeed;
+    AggregatorV3Interface private s_priceFeed;
 
     modifier onlyOwner() {
         // 21509 gas - require
@@ -134,5 +134,25 @@ contract FundMe {
             s_addressToAmountFunded[funderAddress] = 0;
         }
         s_funders = new address[](0);
+    }
+
+    function getOwner() public view returns (address) {
+        return i_owner;
+    }
+
+    function getFunder(uint256 index) public view returns (address) {
+        return s_funders[index];
+    }
+
+    function getAddressToAmountFunded(address funderAddress)
+        public
+        view
+        returns (uint256)
+    {
+        return s_addressToAmountFunded[funderAddress];
+    }
+
+    function getPriceFeed() public view returns (AggregatorV3Interface) {
+        return s_priceFeed;
     }
 }

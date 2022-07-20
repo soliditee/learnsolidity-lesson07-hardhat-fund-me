@@ -23,5 +23,10 @@
   },
   "dependencies": {
     "dotenv": "^16.0.1"
+  },
+  "scripts": {
+    "test": "yarn hardhat test",
+    "test:staging": "yarn hardhat test --network rinkeby",
+    "lint": "yarn solhint contracts/*.sol"
   }
 }
